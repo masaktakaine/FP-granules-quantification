@@ -1,1 +1,1 @@
-# FP-granules-count
+# FP granules quantification
