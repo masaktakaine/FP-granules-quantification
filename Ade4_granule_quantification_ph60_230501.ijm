@@ -1,5 +1,5 @@
 // FP granules quantification
-// author: Masak Takaine
+// developed by Masak Takaine
 
 // This FIJI macro allows automatic detection and analysis of intracellular fluorescent fine granules in yeast cells.
 // As input, two channel image file that contains a pair of fluorescence (Ch #1) and phase contrast (Ch #2) microscopic images is required.
@@ -38,13 +38,12 @@ total_cell_number = newArray;	// An array to store the totall cell number counte
 foci_cell = newArray; 	// An array to store the number of cells having fluorescent granules 
 pct_foci_cell = newArray; 	// An array to store the percent of cells having fluorescent granules
 prominence = newArray;
-defocus = newArray;  // An array to check images that are not suitable for analysis
 
 for (z = 0; z < prom.length; z++){
 	if (prom[z] > 0) {
 currprom=prom[z];
 
-dirD = dirD1 +  "/"+ "prom_" + currprom;
+dirD = dirD1 +  "/output_"+ edate1 + "_prom_" + currprom + "/";
 File.makeDirectory(dirD);
 
 dirBF = dirD + "/BF/";				//Create a folder for phase-contrast or biright-field images
@@ -59,17 +58,9 @@ File.makeDirectory(dirMer);
 dirDR = dirD + "/Drawings/";				//Create a folder for mask images and ROI data
 File.makeDirectory(dirDR);			//
 
-dirCSV = dirD +"/" + edate1 + "_prom" + currprom + "_csv/";
-File.makeDirectory(dirCSV);		// Create a folder for csv files
+sno = 0; // A variable to count observation： Serial No. of observation, equals total number of rows in table "foci_data"
 
-for (i = 0; i < imagefilelist.length; i++) {
-   currFile = dirS + imagefilelist[i];
-    if((endsWith(currFile, ".nd2"))||(endsWith(currFile, ".oib"))||(endsWith(currFile, ".zvi"))) { // process if files ending with .oib or .nd2, or .zvi
-		run("Bio-Formats Macro Extensions"); 
-		Ext.openImagePlus(currFile)}
-	else if ((endsWith(currFile, ".tif"))||(endsWith(currFile, ".tiff"))) {// process if files ending with .tif or .tiff (hyperstack files)
-			open(currFile); 
-		}
+snf = 0; // A variable to count the total number of fluorescent foci: Serial No. of Foci
 
 // Create arraies for table "foci_data"
 date = newArray;			//An array to store date of experiments
@@ -81,9 +72,20 @@ foci_meanint =newArray;		//An array to store mean fluorescence intensity of the 
 foci_x = newArray;			//An array to store the x coordinate of the granule
 foci_y = newArray;			//An array to store the y coordinate of the granule
 cell_area = newArray;		//An array to store the area of cell
+cell_mean = newArray;		//An array to store the mean of cell
+cell_intden = newArray; 	//An array to store the integrated density of cell
 prominences = newArray;		//An array to store the current prominence
 withfoci = newArray;		//An array to check existance of granule in the cell
-defocuses = newArray;  // An array to check cells that are not suitable for analysis
+
+for (i = 0; i < imagefilelist.length; i++) {
+   currFile = dirS + imagefilelist[i];
+    if((endsWith(currFile, ".nd2"))||(endsWith(currFile, ".oib"))||(endsWith(currFile, ".zvi"))) { // process if files ending with .oib or .nd2, or .zvi
+		run("Bio-Formats Macro Extensions"); 
+		Ext.openImagePlus(currFile)}
+	else if ((endsWith(currFile, ".tif"))||(endsWith(currFile, ".tiff"))) {// process if files ending with .tif or .tiff (hyperstack files)
+			open(currFile); 
+		}
+
 
 print("\\Clear"); 							
 title = getTitle();
@@ -137,12 +139,10 @@ c4 = "filled_" + title2;
 imageCalculator("Subtract create", c4,c3);
 selectWindow("Result of " + c4);
 rename("segmented_" + title2);
-run("Set Measurements...", " area redirect=None decimal=3");
+run("Set Measurements...", " area mean integrated redirect=None decimal=3");
 run("Analyze Particles...", "size=400-3000 pixel show=Outlines display exclude clear add"); // size = 667-5000 for x100 phase-contrast image 
 
-sno = 0; // A variable to count observation： Serial No. of observation, equals total number of rows in table "foci_data"
 cwf = 0; // A variable to count the number of cells showing fluorescent granules: Cell With Foci
-snf = 0; // A variable to count the total number of fluorescent granules: Serial No. of Foci
 
 selectWindow(c1);							// Superimpose cell boundaries detected (ROIs) on a fluorescence image
 run("Subtract Background...", "rolling=10");  // Important step to detect fine fluorescent condensates 
@@ -156,30 +156,35 @@ for(k=0; k<roiManager("count"); k++) {   // Activate and analyse a ROI one by on
 	run("Clear Results");
 	roiManager("select", k);
 	Roi.setStrokeColor(255*random,255*random,255*random);
-	area = getValue("Area");		// Store the area of the ROI in a variable		
+	area = getValue("Area");		// Store the Area of the ROI in a variable		
+	mean = getValue("Mean");		// Store the Mean of the ROI in a variable		
+	intden = getValue("IntDen");	// Store the Integrated density of the ROI in a variable		
 	run("Find Maxima...", "prominence=" + currprom + " exclude output=Count");// prominence = noise tolerance
 	nf_k = getResult("Count", 0);	//Store the number of maxima = the number of granules in a variable
 									// number of foci in k-th cell
-	run("Clear Results");			
+//	run("Clear Results");			
 	if(nf_k >= 1){						// If the k-th cell showed some granules
 		
 		cwf = cwf + 1;									
 		run("Find Maxima...", "prominence=" + currprom + " exclude output=List");	//Detect maxima (fluorescent granules), and show their x-y coordinates in the Result table
-		for (l=0; l< nf_k; l++){						// Analyze {nf_k} granules in the k-th cell
+//		for (l=0; l< nf_k; l++){						// Analyze {nf_k} granules in the k-th cell
+		for (l=0; l< nResults; l++){
 			obserbation[sno] = sno+1;
 			foci_serial[sno] = snf+1;					// 
 			cell_number[sno] = k+1;						//
 			image_file[sno] = title_s;					//
-			
+
 			foci_x[sno] = getResult("X", l);			// The x coordinate of the snf-th granule
 			foci_y[sno] = getResult("Y", l);			// The y coordinate of the snf-th granule
 			cell_area[sno] = area;
+			cell_mean[sno] = mean;
+			cell_intden[sno] = intden;
 			prominences[sno] = currprom;
 			date[sno] = edate;
 			withfoci[sno]="TRUE";
 
 			// Make a small oval ROI encloses the snf-th granule 
-			run("Specify...", "width=2 height=2 x="+foci_x[sno]+" y="+foci_y[sno]+" slice=1 oval centered");
+			run("Specify...", "width=2 height=2 x="+foci_x[sno]+" y="+foci_y[sno]+" slice=1 oval centered");//
 			foci_meanint[sno] = getValue("Mean");		// Measure mean intensity of the ROI
 	
 			Table.update;
@@ -194,6 +199,8 @@ for(k=0; k<roiManager("count"); k++) {   // Activate and analyse a ROI one by on
 		foci_x[sno] = "NaN";
 		foci_y[sno] = "NaN";
 		cell_area[sno] = area;
+		cell_mean[sno] = mean;
+		cell_intden[sno] = intden;
 		foci_meanint[sno] = "NaN";
 		prominences[sno] = currprom;
 		date[sno] = edate;
@@ -214,7 +221,8 @@ saveAs("Tiff", dirGreen+getTitle());
 c1t = replace(c1, "\\.nd2", "\\.tif");
 
 // Create a merge image
-run("Merge Channels...", "c4=["+c2+"] c6=["+c1t+"] keep ignore"); // Sandwich variables with {"+} when using in option
+//run("Merge Channels...", "c4=["+c2+"] c6=["+c1t+"] keep ignore"); // Sandwich variables with {"+} when using in option
+run("Merge Channels...", "c4=&c2 c6=&c1t keep ignore");// With Imagej1.43 and later adding "&" can be used instead of string concatenation.
 selectWindow("RGB");
 rename("BFM-" + title);
 RGID = getImageID();
@@ -237,19 +245,19 @@ for (m = 0; m < foci_x.length; m++) {
 }
 saveAs("Tiff", dirDR+getTitle());
 close();
-
-// Create a table summarizing data of individual granules
-Array.show("foci_data", date,image_file,cell_number, obserbation,withfoci, foci_serial, foci_meanint, foci_x, foci_y, cell_area, prominences, defocuses);
-selectWindow("foci_data");					
-saveAs("Results", dirCSV + edate1 + "_"+ title_s + "_prom_" + currprom + ".csv");
-run("Close");
 run("Close All");
 }
+    // Create a table summarizing data of individual granules
+Array.show("foci_data", date,image_file,obserbation,cell_number,withfoci, foci_serial, foci_meanint, foci_x, foci_y, cell_area, cell_mean, cell_intden, prominences);
+selectWindow("foci_data");
+saveAs("Results", dirD +"/"+ edate1 + "_foci_data_prom_" + currprom + ".csv"); 
+run("Close");
+run("Close All");
 
 // Create a table summarizing data of individual image files
- Array.show("foci_stat(row numbers)", file_name, total_cell_number, foci_cell, pct_foci_cell, prominence, defocus);												
+ Array.show("foci_stat(row numbers)", file_name, total_cell_number, foci_cell, pct_foci_cell, prominence);												
     selectWindow("foci_stat");
-    saveAs("Results", dirD +"/"+ edate1 + "_prom_" + currprom + "_foci_stat.csv"); 
+    saveAs("Results", dirD +"/"+ edate1 + "_foci_stat_prom_" + currprom + ".csv"); 
    
 	run("Close");	
     run("Clear Results");						// Reset Results window
