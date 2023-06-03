@@ -120,7 +120,7 @@ run("Dilate");
 
 run("Skeletonize");
 run("Analyze Skeleton (2D/3D)", "prune=[shortest branch] prune_0");
-run("Analyze Skeleton (2D/3D)", "prune=[shortest branch] prune_0");  // Repeat twice to ensure generation of a "Tagged skeleton" image
+//run("Analyze Skeleton (2D/3D)", "prune=[shortest branch] prune_0");  // Repeat twice to ensure generation of a "Tagged skeleton" image
 selectWindow("Tagged skeleton");
 run("Convert to Mask");
 rename("debranch_" + title2);
